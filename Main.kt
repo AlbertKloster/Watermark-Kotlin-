@@ -21,6 +21,11 @@ fun main() {
 
         if (image.width != watermark.width || image.height != watermark.height) throw RuntimeException("The image and watermark dimensions are different.")
 
+        val alpha: Boolean = if (watermark.transparency == 3) {
+            println("Do you want to use the watermark's Alpha channel?")
+            readln().lowercase() == "yes"
+        } else false
+
         println("Input the watermark transparency percentage (Integer 0-100):")
         val input = readln()
         if (!input.matches(Regex("\\d+"))) throw RuntimeException("The transparency percentage isn't an integer number.")
@@ -32,17 +37,7 @@ fun main() {
         val (outputFileName, outputFileExtension) = readln().split(".")
         if (!outputFileExtension.matches(Regex("jpg|png"))) throw RuntimeException("The output file extension isn't \"jpg\" or \"png\".")
 
-        val outputImage = BufferedImage(image.width, image.height, BufferedImage.TYPE_INT_RGB)
-        for (i in 0 until outputImage.width) {
-            for (j in 0 until outputImage.height) {
-                val color = Color(
-                    (weight * Color(watermark.getRGB(i, j)).red + (100 - weight) * Color(image.getRGB(i, j)).red) / 100,
-                    (weight * Color(watermark.getRGB(i, j)).green + (100 - weight) * Color(image.getRGB(i, j)).green) / 100,
-                    (weight * Color(watermark.getRGB(i, j)).blue + (100 - weight) * Color(image.getRGB(i, j)).blue) / 100
-                )
-                outputImage.setRGB(i, j, color.rgb)
-            }
-        }
+        val outputImage: BufferedImage = getWatermarkedImage(image, watermark, weight, alpha)
 
         ImageIO.write(outputImage, outputFileExtension, File("$outputFileName.$outputFileExtension"))
         println("The watermarked image $outputFileName.$outputFileExtension has been created.")
@@ -50,6 +45,23 @@ fun main() {
     } catch (e: RuntimeException) {
         println(e.message)
     }
+}
+
+private fun getWatermarkedImage(image: BufferedImage, watermark: BufferedImage, weight: Int, alpha: Boolean = false): BufferedImage {
+    val watermarkedImage = BufferedImage(image.width, image.height, BufferedImage.TYPE_INT_RGB)
+    for (x in 0 until watermarkedImage.width) {
+        for (y in 0 until watermarkedImage.height) {
+            val watermarkColor = Color(watermark.getRGB(x, y), alpha)
+            val imageColor = Color(image.getRGB(x, y))
+            val color = if (watermarkColor.alpha == 0) imageColor else Color(
+                (weight * watermarkColor.red + (100 - weight) * Color(image.getRGB(x, y)).red) / 100,
+                (weight * watermarkColor.green + (100 - weight) * Color(image.getRGB(x, y)).green) / 100,
+                (weight * watermarkColor.blue + (100 - weight) * Color(image.getRGB(x, y)).blue) / 100
+            )
+            watermarkedImage.setRGB(x, y, color.rgb)
+        }
+    }
+    return watermarkedImage
 }
 
 private fun readImage(file: String): BufferedImage {
@@ -63,4 +75,3 @@ private fun readImage(file: String): BufferedImage {
 private fun isNotThreeColorComponents(bufferedImage: BufferedImage) = bufferedImage.colorModel.numColorComponents != 3
 
 private fun isNot24or32bit(bufferedImage: BufferedImage) = bufferedImage.colorModel.pixelSize != 24 && bufferedImage.colorModel.pixelSize != 32
-
